@@ -1,0 +1,39 @@
+interface fifo_if #(
+    parameter DATA_WIDTH = 16,
+    parameter DEPTH = 8,
+    parameter ADDR_WIDTH = 3
+) 
+  (
+    input logic clk
+);
+    logic reset_n;
+    logic write_en;
+    logic read_en;
+    logic [DATA_WIDTH-1:0] data_in;
+    logic [DATA_WIDTH-1:0] data_out;
+    logic full;
+    logic empty;
+    logic almost_full;
+    logic almost_empty;
+    logic overflow;
+    logic underflow;
+
+    clocking cb @(posedge clk);
+        output reset_n;
+        output write_en;
+        output read_en;
+        output data_in;
+        input data_out;
+        input full;
+        input empty;
+        input almost_full;
+        input almost_empty;
+        input overflow;
+        input underflow;
+    endclocking
+
+    /*modport DUT (
+        input clk, reset_n, write_en, read_en, data_in,
+        output data_out, full, empty, almost_full, almost_empty, overflow, underflow
+    );*/
+endinterface

@@ -1,0 +1,45 @@
+class fifo_driver extends uvm_driver #(fifo_seq_item);
+    `uvm_component_utils(fifo_driver)
+
+    virtual fifo_if vif;
+    fifo_seq_item req;
+
+    // Constructor
+    function new(string name = "fifo_driver", uvm_component parent);
+        super.new(name, parent);
+    endfunction
+
+    // Build phase
+    function void build_phase(uvm_phase phase);
+        super.build_phase(phase);
+        if (!uvm_config_db#(virtual fifo_if)::get(this, "", "fifo_if", vif)) begin
+            `uvm_fatal("NO_VIF", "Virtual interface not found in config DB")
+        end
+    endfunction
+
+    // Main run task
+    task run_phase(uvm_phase phase);
+        super.run_phase(phase);
+        // Initialize signals
+        vif.cb.reset_n <= 1;
+        vif.cb.write_en <= 0;
+        vif.cb.read_en <= 0;
+        vif.cb.data_in <= 0;
+        forever begin
+            seq_item_port.get_next_item(req);
+            drive();
+            seq_item_port.item_done();
+        end
+    endtask
+
+    // Drive task
+    task drive();
+        @(vif.cb); // Wait for 1 clock edge
+        vif.cb.reset_n <= req.reset_n;
+        vif.cb.write_en <= req.write_en;
+        vif.cb.read_en <= req.read_en;
+        vif.cb.data_in <= req.data_in;
+        `uvm_info("FIFO_DRIVER", $sformatf("Driving item: reset_n=%0b, write_en=%0b, read_en=%0b, data_in=0x%0h",req.reset_n, req.write_en, req.read_en, req.data_in), UVM_MEDIUM)
+    endtask
+endclass
+

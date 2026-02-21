@@ -1,0 +1,175 @@
+class fifo_test extends uvm_test;
+    `uvm_component_utils(fifo_test)
+
+    fifo_env env;
+    virtual fifo_if vif;
+
+    // Sequences
+    fifo_write_seq write_seq;
+    fifo_read_seq read_seq;
+    fifo_simultaneous_seq sim_seq;
+    fifo_simultaneous_full_seq sim_full_seq;
+
+    // Constructor
+    function new(string name = "fifo_test", uvm_component parent);
+        super.new(name, parent);
+    endfunction
+
+    // Build phase
+    function void build_phase(uvm_phase phase);
+        super.build_phase(phase);
+        env = fifo_env::type_id::create("env", this);
+        if (!uvm_config_db#(virtual fifo_if)::get(this, "", "fifo_if", vif))
+            `uvm_fatal("TEST", "No virtual interface")
+       
+        uvm_config_db#(virtual fifo_if)::set(this, "env.agent.driver", "fifo_if", vif);
+        uvm_config_db#(virtual fifo_if)::set(this, "env.agent.monitor", "fifo_if", vif);
+    endfunction
+
+    // Connect phase
+    function void connect_phase(uvm_phase phase);
+        super.connect_phase(phase);
+    endfunction
+
+    // Run phase
+    task run_phase(uvm_phase phase);
+        super.run_phase(phase);
+        phase.raise_objection(this, "Starting FIFO test sequence");
+
+        // Reset
+        begin
+            fifo_seq_item item = fifo_seq_item::type_id::create("item");
+            `uvm_info("FIFO_TEST", "Starting reset sequence", UVM_LOW)
+            start_item(item);
+            if (!item.randomize() with { reset_n == 0; write_en == 0; read_en == 0; }) begin
+                `uvm_error("FIFO_TEST", "Randomization failed")
+            end
+            item.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_TEST", $sformatf("Reset: reset_n=%0b, write_en=%0b, read_en=%0b",
+                                             item.reset_n, item.write_en, item.read_en), UVM_MEDIUM)
+            finish_item(item);
+            @(vif.cb);
+            start_item(item);
+            if (!item.randomize() with { reset_n == 1; write_en == 0; read_en == 0; }) begin
+                `uvm_error("FIFO_TEST", "Randomization failed")
+            end
+            item.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_TEST", $sformatf("Reset release: reset_n=%0b, write_en=%0b, read_en=%0b",
+                                             item.reset_n, item.write_en, item.read_en), UVM_MEDIUM)
+            finish_item(item);
+        end
+
+        // Basic write/read test
+        begin
+            write_seq = fifo_write_seq::type_id::create("write_seq");
+            read_seq  = fifo_read_seq::type_id::create("read_seq");
+            `uvm_info("FIFO_TEST", "Starting basic write/read test", UVM_LOW)
+            write_seq.start(env.agent.sequencer);
+            read_seq.start(env.agent.sequencer);
+        end
+
+        // Underflow test
+        begin
+            fifo_seq_item item = fifo_seq_item::type_id::create("item");
+            `uvm_info("FIFO_TEST", "Starting underflow test", UVM_LOW)
+            start_item(item);
+            if (!item.randomize() with { reset_n == 1; write_en == 1; read_en == 0; data_in == 16'hA5A5; }) begin
+                `uvm_error("FIFO_TEST", "Randomization failed")
+            end
+            item.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_TEST", $sformatf("Write for underflow: reset_n=%0b, write_en=%0b, read_en=%0b, data_in=%0h",
+                                             item.reset_n, item.write_en, item.read_en, item.data_in), UVM_MEDIUM)
+            finish_item(item);
+            start_item(item);
+            if (!item.randomize() with { reset_n == 0; write_en == 0; read_en == 0; }) begin
+                `uvm_error("FIFO_TEST", "Randomization failed")
+            end
+            item.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_TEST", $sformatf("Reset for underflow: reset_n=%0b, write_en=%0b, read_en=%0b",
+                                             item.reset_n, item.write_en, item.read_en), UVM_MEDIUM)
+            finish_item(item);
+            @(vif.cb);
+            start_item(item);
+            if (!item.randomize() with { reset_n == 1; write_en == 0; read_en == 0; }) begin
+                `uvm_error("FIFO_TEST", "Randomization failed")
+            end
+            item.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_TEST", $sformatf("Reset release: reset_n=%0b, write_en=%0b, read_en=%0b",
+                                             item.reset_n, item.write_en, item.read_en), UVM_MEDIUM)
+            finish_item(item);
+            start_item(item);
+            if (!item.randomize() with { reset_n == 1; write_en == 0; read_en == 1; }) begin
+                `uvm_error("FIFO_TEST", "Randomization failed")
+            end
+            item.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_TEST", $sformatf("Read for underflow: reset_n=%0b, write_en=%0b, read_en=%0b",
+                                             item.reset_n, item.write_en, item.read_en), UVM_MEDIUM)
+            finish_item(item);
+        end
+
+        // Overflow test
+        begin
+            write_seq = fifo_write_seq::type_id::create("write_seq");
+            `uvm_info("FIFO_TEST", "Starting overflow test", UVM_LOW)
+            write_seq.start(env.agent.sequencer);
+
+            fifo_seq_item item = fifo_seq_item::type_id::create("item");
+            start_item(item);
+            if (!item.randomize() with { reset_n == 1; write_en == 1; read_en == 0; data_in == 16'hFFFF; }) begin
+                `uvm_error("FIFO_TEST", "Randomization failed")
+            end
+            item.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_TEST", $sformatf("Write for overflow: reset_n=%0b, write_en=%0b, read_en=%0b, data_in=%0h",
+                                             item.reset_n, item.write_en, item.read_en, item.data_in), UVM_MEDIUM)
+            finish_item(item);
+
+            read_seq = fifo_read_seq::type_id::create("read_seq");
+            read_seq.start(env.agent.sequencer);
+
+            start_item(item);
+            if (!item.randomize() with { reset_n == 1; write_en == 0; read_en == 1; }) begin
+                `uvm_error("FIFO_TEST", "Randomization failed")
+            end
+            item.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_TEST", $sformatf("Extra read for overflow: reset_n=%0b, write_en=%0b, read_en=%0b",
+                                             item.reset_n, item.write_en, item.read_en), UVM_MEDIUM)
+            finish_item(item);
+        end
+
+        // Simultaneous read/write empty test
+        begin
+            fifo_seq_item item = fifo_seq_item::type_id::create("item");
+            `uvm_info("FIFO_TEST", "Starting simultaneous read/write empty test", UVM_LOW)
+            start_item(item);
+            if (!item.randomize() with { reset_n == 0; write_en == 0; read_en == 0; }) begin
+                `uvm_error("FIFO_TEST", "Randomization failed")
+            end
+            item.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_TEST", $sformatf("Reset for simultaneous: reset_n=%0b, write_en=%0b, read_en=%0b",
+                                             item.reset_n, item.write_en, item.read_en), UVM_MEDIUM)
+            finish_item(item);
+            @(vif.cb);
+            start_item(item);
+            if (!item.randomize() with { reset_n == 1; write_en == 0; read_en == 0; }) begin
+                `uvm_error("FIFO_TEST", "Randomization failed")
+            end
+            item.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_TEST", $sformatf("Reset release: reset_n=%0b, write_en=%0b, read_en=%0b",
+                                             item.reset_n, item.write_en, item.read_en), UVM_MEDIUM)
+            finish_item(item);
+
+            sim_seq = fifo_simultaneous_seq::type_id::create("sim_seq");
+            sim_seq.start(env.agent.sequencer);
+        end
+
+        // Simultaneous read/write full test
+        begin
+            sim_full_seq = fifo_simultaneous_full_seq::type_id::create("sim_full_seq");
+            `uvm_info("FIFO_TEST", "Starting simultaneous read/write full test", UVM_LOW)
+            sim_full_seq.start(env.agent.sequencer);
+        end
+
+        #1000;
+        phase.drop_objection(this, "FIFO test sequence completed");
+    endtask
+endclass

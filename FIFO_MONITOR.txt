@@ -1,0 +1,45 @@
+class fifo_monitor extends uvm_monitor;
+    `uvm_component_utils(fifo_monitor)
+
+    virtual fifo_if vif;
+    uvm_analysis_port #(fifo_seq_item) item_collected_port;
+    fifo_seq_item req;
+
+    // Constructor
+    function new(string name = "fifo_monitor", uvm_component parent);
+        super.new(name, parent);
+    endfunction
+
+    // Build phase
+    function void build_phase(uvm_phase phase);
+        super.build_phase(phase);
+        item_collected_port = new("item_collected_port", this);
+        req = fifo_seq_item::type_id::create("req");
+        if (!uvm_config_db#(virtual fifo_if)::get(this, "", "fifo_if", vif)) begin
+            `uvm_fatal("FIFO_MON", "Virtual interface not found")
+        end
+    endfunction
+
+    // Run phase
+    task run_phase(uvm_phase phase);
+        super.run_phase(phase);
+        forever begin
+            @(vif.cb); // Sample at clock edge via clocking block
+            req.reset_n = vif.cb.reset_n;
+            req.write_en = vif.cb.write_en;
+            req.read_en = vif.cb.read_en;
+            req.data_in = vif.cb.data_in;
+            req.data_out = vif.cb.data_out;
+            req.full = vif.cb.full;
+            req.empty = vif.cb.empty;
+            req.almost_full = vif.cb.almost_full;
+            req.almost_empty = vif.cb.almost_empty;
+            req.overflow = vif.cb.overflow;
+            req.underflow = vif.cb.underflow;
+
+            `uvm_info("FIFO_MON", $sformatf("Observed: reset_n=%0b, write_en=%0b, read_en=%0b, data_in=%0h, data_out=%0h, full=%0b, empty=%0b, almost_full=%0b, almost_empty=%0b, overflow=%0b, underflow=%0b",req.reset_n, req.write_en, req.read_en, req.data_in, req.data_out,req.full, req.empty, req.almost_full, req.almost_empty,req.overflow, req.underflow), UVM_MEDIUM)
+
+            item_collected_port.write(req);
+        end
+    endtask
+endclass

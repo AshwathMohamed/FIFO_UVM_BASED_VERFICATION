@@ -1,0 +1,71 @@
+`include "uvm_macros.svh"
+`include "fifo_interface.sv"
+`include "fifo_pkg.sv"
+
+
+module fifo_testbench;
+    import uvm_pkg::*;
+    import fifo_pkg::*;
+
+    logic clk;
+
+    // Instantiate the interface
+    fifo_if #(.DATA_WIDTH(16), .DEPTH(8), .ADDR_WIDTH(3)) fifo_if (.clk(clk));
+  
+    fifo #(
+        .DATA_WIDTH(16),
+        .DEPTH(8),
+        .ADDR_WIDTH(3)
+    ) fifo_inst (
+        .clk(fifo_if.clk),
+        .reset_n(fifo_if.reset_n),
+        .write_en(fifo_if.write_en),
+        .read_en(fifo_if.read_en),
+        .data_in(fifo_if.data_in),
+        .data_out(fifo_if.data_out),
+        .full(fifo_if.full),
+        .empty(fifo_if.empty),
+        .almost_full(fifo_if.almost_full),
+        .almost_empty(fifo_if.almost_empty),
+        .overflow(fifo_if.overflow),
+        .underflow(fifo_if.underflow)
+    );
+
+    // Clock generation
+    initial begin
+        clk = 0;
+        forever #5 clk = ~clk;
+    end
+
+    // Initialize interface signals
+    initial begin
+        fifo_if.write_en = 0;
+        fifo_if.read_en = 0;
+        fifo_if.data_in = 0;
+        fifo_if.reset_n = 1;
+    end
+
+    // Set virtual interface
+    initial begin
+        uvm_config_db#(virtual fifo_if)::set(null, "uvm_test_top", "fifo_if", fifo_if);
+    end
+
+    initial begin
+        $dumpfile("fifo_testbench.vcd");
+        $dumpvars(0, fifo_testbench);
+    end
+
+    initial begin
+        $monitor($time, " clk=%b reset_n=%b write_en=%b read_en=%b data_in=0x%0h data_out=0x%0h full=%b empty=%b almost_full=%b almost_empty=%b overflow=%b underflow=%b",clk, fifo_if.reset_n, fifo_if.write_en, fifo_if.read_en, fifo_if.data_in, fifo_if.data_out,fifo_if.full, fifo_if.empty, fifo_if.almost_full, fifo_if.almost_empty,fifo_if.overflow, fifo_if.underflow);
+    end
+
+    initial begin
+        run_test("fifo_test");
+    end
+
+    initial begin
+        #10000;
+        $finish;
+    end
+
+endmodule

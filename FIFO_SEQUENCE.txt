@@ -1,0 +1,138 @@
+class fifo_write_seq extends uvm_sequence #(fifo_seq_item);
+    `uvm_object_utils(fifo_write_seq)
+
+    fifo_seq_item req;
+
+    function new(string name = "fifo_write_seq");
+        super.new(name);
+    endfunction
+
+    virtual task body();
+        req = fifo_seq_item::type_id::create("req");
+        for (int i = 0; i < 8; i++) begin // DEPTH = 8
+            start_item(req);
+            if (!req.randomize() with {
+                reset_n == 1;
+                write_en == 1;
+                read_en == 0;
+                data_in == i;
+            }) begin
+                `uvm_error("FIFO_WRITE_SEQ", "Randomization failed")
+            end
+            req.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_WRITE_SEQ", $sformatf("Generated item: reset_n=%0b, write_en=%0b, read_en=%0b, data_in=%0h",req.reset_n, req.write_en, req.read_en, req.data_in), UVM_MEDIUM)
+            finish_item(req);
+        end
+    endtask
+endclass
+
+class fifo_read_seq extends uvm_sequence #(fifo_seq_item);
+    `uvm_object_utils(fifo_read_seq)
+
+    fifo_seq_item req;
+
+    function new(string name = "fifo_read_seq");
+        super.new(name);
+    endfunction
+
+    virtual task body();
+        req = fifo_seq_item::type_id::create("req");
+        for (int i = 0; i < 8; i++) begin // DEPTH = 8
+            start_item(req);
+            if (!req.randomize() with {
+                reset_n == 1;
+                write_en == 0;
+                read_en == 1;
+            }) begin
+                `uvm_error("FIFO_READ_SEQ", "Randomization failed")
+            end
+            req.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_READ_SEQ", $sformatf("Generated item: reset_n=%0b, write_en=%0b, read_en=%0b, data_in=%0h",
+                                                 req.reset_n, req.write_en, req.read_en, req.data_in), UVM_MEDIUM)
+            finish_item(req);
+        end
+    endtask
+endclass
+
+class fifo_simultaneous_seq extends uvm_sequence #(fifo_seq_item);
+    `uvm_object_utils(fifo_simultaneous_seq)
+
+    fifo_seq_item req;
+
+    function new(string name = "fifo_simultaneous_seq");
+        super.new(name);
+    endfunction
+
+    virtual task body();
+        req = fifo_seq_item::type_id::create("req");
+        start_item(req);
+        if (!req.randomize() with {
+            reset_n == 1;
+            write_en == 1;
+            read_en == 1;
+            data_in == 16'h1234;
+        }) begin
+            `uvm_error("FIFO_SIM_SEQ", "Randomization failed")
+        end
+        req.write_read_exclusive.constraint_mode(0);
+        `uvm_info("FIFO_SIM_SEQ", $sformatf("Generated item: reset_n=%0b, write_en=%0b, read_en=%0b, data_in=%0h",
+                                            req.reset_n, req.write_en, req.read_en, req.data_in), UVM_MEDIUM)
+        finish_item(req);
+        start_item(req);
+        if (!req.randomize() with {
+            reset_n == 1;
+            write_en == 1;
+            read_en == 1;
+            data_in == 16'h5678;
+        }) begin
+            `uvm_error("FIFO_SIM_SEQ", "Randomization failed")
+        end
+        req.write_read_exclusive.constraint_mode(0);
+        `uvm_info("FIFO_SIM_SEQ", $sformatf("Generated item: reset_n=%0b, write_en=%0b, read_en=%0b, data_in=%0h",
+                                            req.reset_n, req.write_en, req.read_en, req.data_in), UVM_MEDIUM)
+        finish_item(req);
+    endtask
+endclass
+
+class fifo_simultaneous_full_seq extends uvm_sequence #(fifo_seq_item);
+    `uvm_object_utils(fifo_simultaneous_full_seq)
+
+    fifo_seq_item req;
+
+    function new(string name = "fifo_simultaneous_full_seq");
+        super.new(name);
+    endfunction
+
+    virtual task body();
+        fifo_write_seq write_seq = fifo_write_seq::type_id::create("write_seq");
+        write_seq.start(m_sequencer);
+        req = fifo_seq_item::type_id::create("req");
+        start_item(req);
+        if (!req.randomize() with {
+            reset_n == 1;
+            write_en == 1;
+            read_en == 1;
+            data_in == 16'h9ABC;
+        }) begin
+            `uvm_error("FIFO_SIM_FULL_SEQ", "Randomization failed")
+        end
+        req.write_read_exclusive.constraint_mode(0);
+        `uvm_info("FIFO_SIM_FULL_SEQ", $sformatf("Generated item: reset_n=%0b, write_en=%0b, read_en=%0b, data_in=%0h",req.reset_n, req.write_en, req.read_en, req.data_in), UVM_MEDIUM)
+        finish_item(req);
+        repeat (13) begin
+            start_item(req);
+            if (!req.randomize() with {
+                reset_n == 1;
+                write_en == 1;
+                read_en == 1;
+                data_in == 16'h9ABC;
+            }) begin
+                `uvm_error("FIFO_SIM_FULL_SEQ", "Randomization failed")
+            end
+            req.write_read_exclusive.constraint_mode(0);
+            `uvm_info("FIFO_SIM_FULL_SEQ", $sformatf("Generated item: reset_n=%0b, write_en=%0b, read_en=%0b, data_in=%0h",
+                                                     req.reset_n, req.write_en, req.read_en, req.data_in), UVM_MEDIUM)
+            finish_item(req);
+        end
+    endtask
+endclass

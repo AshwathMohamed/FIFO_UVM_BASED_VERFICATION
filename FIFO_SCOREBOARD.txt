@@ -1,0 +1,92 @@
+class fifo_scoreboard extends uvm_scoreboard;
+    `uvm_component_utils(fifo_scoreboard)
+
+    uvm_analysis_imp #(fifo_seq_item, fifo_scoreboard) item_collected_export;
+    bit [15:0] fifo_queue [$];
+    int error_count = 0;
+    int DEPTH = 8;
+
+    // Constructor
+    function new(string name = "fifo_scoreboard", uvm_component parent);
+        super.new(name, parent);
+    endfunction
+
+    // Build phase
+    function void build_phase(uvm_phase phase);
+        super.build_phase(phase);
+        item_collected_export = new("item_collected_export", this);
+    endfunction
+
+    function void write(fifo_seq_item item);
+        if (!item.reset_n) begin
+            fifo_queue.delete();
+            `uvm_info("SCOREBOARD", "Reset detected: cleared reference queue", UVM_MEDIUM)
+        end
+        else begin
+            // write operation
+            if (item.write_en && !item.full) begin
+                fifo_queue.push_back(item.data_in);
+                `uvm_info("SCOREBOARD", $sformatf("Pushed to model: data_in = 0x%0h, queue size = %0d", item.data_in, fifo_queue.size()), UVM_MEDIUM)
+            end
+            // read operation
+            if (item.read_en && !item.empty) begin
+                if (fifo_queue.size() > 0) begin
+                    bit [15:0] expected = fifo_queue.pop_front();
+                    if (item.data_out !== expected) begin
+                        `uvm_error("SCOREBOARD", $sformatf("Data mismatch: Expected = 0x%0h, Actual = 0x%0h", expected, item.data_out))
+                        error_count++;
+                    end else begin
+                        `uvm_info("SCOREBOARD", $sformatf("Data match: Expected = 0x%0h, Actual = 0x%0h", expected, item.data_out), UVM_MEDIUM)
+                    end
+                end else begin
+                    `uvm_error("SCOREBOARD", "Read attempted from empty reference model!")
+                    error_count++;
+                end
+            end
+            // Check underflow flag
+            if (item.read_en && item.empty && !item.underflow) begin
+                `uvm_error("SCOREBOARD", "Underflow flag not set when reading from empty FIFO")
+                error_count++;
+            end
+            // Check overflow flag
+            if (item.write_en && item.full && !item.overflow) begin
+                `uvm_error("SCOREBOARD", "Overflow flag not set when writing to full FIFO")
+                error_count++;
+            end
+            // Check full flag
+            if (item.full !== (fifo_queue.size() == DEPTH)) begin
+                `uvm_error("SCOREBOARD", $sformatf("Full flag mismatch: Expected=%0b, Actual=%0b, queue size=%0d", 
+                                                   (fifo_queue.size() == DEPTH), item.full, fifo_queue.size()))
+                error_count++;
+            end
+            // Check empty flag
+            if (item.empty !== (fifo_queue.size() == 0)) begin
+                `uvm_error("SCOREBOARD", $sformatf("Empty flag mismatch: Expected=%0b, Actual=%0b, queue size=%0d", 
+                                                   (fifo_queue.size() == 0), item.empty, fifo_queue.size()))
+                error_count++;
+            end
+            // Check almost_full flag
+            if (item.almost_full !== (fifo_queue.size() >= DEPTH - 1)) begin
+                `uvm_error("SCOREBOARD", $sformatf("Almost_full flag mismatch: Expected=%0b, Actual=%0b, queue size=%0d", 
+                                                   (fifo_queue.size() >= DEPTH - 1), item.almost_full, fifo_queue.size()))
+                error_count++;
+            end
+            // Check almost_empty flag
+            if (item.almost_empty !== (fifo_queue.size() <= 1)) begin
+                `uvm_error("SCOREBOARD", $sformatf("Almost_empty flag mismatch: Expected=%0b, Actual=%0b, queue size=%0d", 
+                                                   (fifo_queue.size() <= 1), item.almost_empty, fifo_queue.size()))
+                error_count++;
+            end
+        end
+    endfunction
+
+    // Report phase
+    function void report_phase(uvm_phase phase);
+        super.report_phase(phase);
+        if (error_count == 0) begin
+            `uvm_info("SCOREBOARD", "All tests passed successfully", UVM_LOW)
+        end else begin
+            `uvm_error("SCOREBOARD", $sformatf("Test completed with %0d errors", error_count))
+        end
+    endfunction
+endclass
